@@ -1,0 +1,156 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider          = "mysql"
+  url               = env("DATABASE_URL")
+  shadowDatabaseUrl = "mysql://u934073279_Marius_shadow:MilanaDainyte1@srv1163.hstgr.io:3306/u934073279_shadow"
+}
+
+model User {
+  id                   String             @id @default(cuid())
+  email                String             @unique
+  password             String
+  name                 String?
+  country              String?
+  role                 Role               @default(USER)
+  status               UserStatus         @default(ACTIVE)
+  trialEndsAt          DateTime?
+  subscriptionStatus   SubscriptionStatus @default(FREE_TRIAL)
+  subscriptionEndsAt   DateTime?
+  stripeCustomerId     String?            @unique
+  createdAt            DateTime           @default(now())
+  updatedAt            DateTime           @updatedAt
+  bio                  String?
+  emailNotifications   Boolean            @default(true)
+  passwordResetExpires DateTime?
+  passwordResetToken   String?            @unique
+  profileImageUrl      String?
+  websiteUrl           String?
+  plan                 Plan               @default(FREE_TRIAL)
+  collections          Collection[]
+  accounts             Account[]
+  collectionsCreatedCount Int           @default(0)
+}
+
+model Account {
+  id                String  @id @default(cuid())
+  userId            String
+  provider          String // pvz., "facebook", "instagram", "google"
+  providerAccountId String // Vartotojo ID platformoje
+  access_token      String? @db.Text
+  refresh_token     String? @db.Text
+  expires_at        Int?
+  token_type        String? // pvz., "Bearer"
+  scope             String? // Suteiktos teisės, pvz., "email,profile"
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+}
+
+model Collection {
+  id                  String             @id @default(cuid())
+  name                String
+  createdAt           DateTime           @default(now())
+  updatedAt           DateTime           @updatedAt
+  shareId             String             @unique @default(cuid())
+  userId              String
+  processedZipPath    String?
+  clientEmail         String?
+  clientName          String?
+  expiresAt           DateTime?
+  password            String?
+  status              CollectionStatus   @default(DRAFT)
+  allowPromotionalUse Boolean            @default(false)
+  coverPhotoId        String?            @unique
+  coverPhoto          Photo?             @relation("CoverPhoto", fields: [coverPhotoId], references: [id])
+  user                User               @relation(fields: [userId], references: [id], onDelete: Cascade)
+  editedPhotos        EditedPhoto[]
+  photos              Photo[]            @relation("CollectionPhotos")
+  selections          Selection[]
+  promotionalPhotos   PromotionalPhoto[]
+
+  @@index([userId])
+}
+
+model Photo {
+  id                String             @id @default(cuid())
+  filename          String
+  storagePath       String
+  createdAt         DateTime           @default(now())
+  collectionId      String
+  isCoverFor        Collection?        @relation("CoverPhoto")
+  collection        Collection         @relation("CollectionPhotos", fields: [collectionId], references: [id], onDelete: Cascade)
+  selection         Selection?
+  promotionalPhotos PromotionalPhoto[]
+
+  @@index([collectionId])
+}
+
+model EditedPhoto {
+  id           String     @id @default(cuid())
+  filename     String
+  storagePath  String
+  createdAt    DateTime   @default(now())
+  collectionId String
+  collection   Collection @relation(fields: [collectionId], references: [id], onDelete: Cascade)
+
+  @@index([collectionId])
+}
+
+model Selection {
+  id           String     @id @default(cuid())
+  createdAt    DateTime   @default(now())
+  collectionId String
+  photoId      String     @unique
+  collection   Collection @relation(fields: [collectionId], references: [id], onDelete: Cascade)
+  photo        Photo      @relation(fields: [photoId], references: [id], onDelete: Cascade)
+
+  @@index([collectionId])
+}
+
+model PromotionalPhoto {
+  id           String     @id @default(cuid())
+  collectionId String
+  collection   Collection @relation(fields: [collectionId], references: [id], onDelete: Cascade)
+  photoId      String     @unique // Each photo can only be a promotional photo once per collection
+  photo        Photo      @relation(fields: [photoId], references: [id], onDelete: Cascade)
+  order        Int? // To specify the order (e.g., 1, 2, 3)
+  createdAt    DateTime   @default(now())
+  updatedAt    DateTime   @updatedAt
+
+  @@unique([collectionId, photoId]) // A photo can be promotional for a collection only once
+}
+
+enum Role {
+  USER
+  ADMIN
+}
+
+enum UserStatus {
+  ACTIVE
+  SUSPENDED
+}
+
+enum SubscriptionStatus {
+  FREE_TRIAL
+  ACTIVE
+  CANCELED
+  INACTIVE
+}
+
+enum Plan {
+  FREE_TRIAL
+  STANDARD
+  PRO
+}
+
+enum CollectionStatus {
+  DRAFT
+  SELECTING
+  REVIEWING
+  DELIVERED
+  ARCHIVED
+}
